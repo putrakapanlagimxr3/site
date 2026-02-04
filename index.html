@@ -1946,7 +1946,29 @@ console.log(greet('World'));</textarea>
                 
                 updateProgress('deployer', 30, 'Uploading ke Vercel...');
                 
+                // Determine the correct filename
+                const isHTML = deployerFile.name.toLowerCase().endsWith('.html');
+                const targetFileName = isHTML ? 'index.html' : deployerFile.name;
+                
                 updateProgress('deployer', 50, 'Creating deployment...');
+                
+                // Create deployment with proper file structure
+                const deploymentPayload = {
+                    name: projectName,
+                    files: [
+                        {
+                            file: targetFileName,
+                            data: base64Content,
+                            encoding: 'base64'
+                        }
+                    ],
+                    projectSettings: {
+                        framework: null,
+                        buildCommand: null,
+                        outputDirectory: null
+                    },
+                    target: 'production'
+                };
                 
                 // Create deployment via Vercel API
                 const deploymentResponse = await fetch('https://api.vercel.com/v13/deployments', {
@@ -1955,24 +1977,14 @@ console.log(greet('World'));</textarea>
                         'Authorization': `Bearer ${VERCEL_TOKEN}`,
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({
-                        name: projectName,
-                        files: [
-                            {
-                                file: deployerFile.name.endsWith('.html') ? 'index.html' : deployerFile.name,
-                                data: base64Content
-                            }
-                        ],
-                        projectSettings: {
-                            framework: null
-                        }
-                    })
+                    body: JSON.stringify(deploymentPayload)
                 });
                 
                 updateProgress('deployer', 80, 'Finalizing deployment...');
                 
                 if (!deploymentResponse.ok) {
                     const errorData = await deploymentResponse.json();
+                    console.error('Vercel API error:', errorData);
                     throw new Error(errorData.error?.message || 'Deployment gagal');
                 }
                 
@@ -1998,6 +2010,9 @@ console.log(greet('World'));</textarea>
                 showProgress('deployer', false);
                 
                 let errorMessage = 'Deployment gagal: ' + error.message;
+                if (error.message.includes('rate limit')) {
+                    errorMessage = 'Terlalu banyak deployment. Tunggu beberapa menit dan coba lagi.';
+                }
                 
                 showError('deployer', errorMessage);
                 btn.disabled = false;
